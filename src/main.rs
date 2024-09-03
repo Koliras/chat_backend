@@ -1,41 +1,18 @@
-use axum::{
-    http::StatusCode,
-    routing::{get, post},
-    Json, Router,
-};
+use axum::{routing::post, Router};
+use std::{error::Error, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use chat_backend::{auth::register, init_db, AppState};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
+    let db_pool = init_db().await;
+    let shared_state = Arc::new(AppState { db_pool });
+
     let app = Router::new()
-        .route("/", get(root))
-        .route("/users", post(create_user));
+        .route("/register", post(register))
+        .with_state(shared_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn root() -> &'static str {
-    "Hello, World!"
-}
-
-async fn create_user(Json(payload): Json<CreateUser>) -> (StatusCode, Json<User>) {
-    let user = User {
-        id: 1337,
-        username: payload.username,
-    };
-
-    (StatusCode::CREATED, Json(user))
-}
-
-#[derive(Deserialize)]
-struct CreateUser {
-    username: String,
-}
-
-#[derive(Serialize)]
-struct User {
-    id: u64,
-    username: String,
+    Ok(())
 }
