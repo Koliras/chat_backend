@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 axum = { version = "0.7.5", features = ["ws"] }
+bcrypt = "0.15.1"
 dotenv = "0.15.0"
 serde = { version = "1.0.209", features = ["derive", "alloc", "rc", "serde_derive"] }
 sqlx = { version = "0.8.1", features = ["postgres", "runtime-tokio-rustls"] }

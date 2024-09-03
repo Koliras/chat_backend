@@ -24,11 +24,19 @@ pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterUser>,
 ) -> StatusCode {
+    let pass_encrypt_res = bcrypt::hash(payload.password.as_bytes(), 10);
+    let password: String;
+
+    match pass_encrypt_res {
+        Ok(hash) => password = hash,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    }
+
     let result =
         sqlx::query("INSERT INTO chat.user (username, email, password) VALUES ($1, $2, $3)")
             .bind(payload.username)
             .bind(payload.email)
-            .bind(payload.password)
+            .bind(password)
             .execute(&state.db_pool)
             .await;
 
