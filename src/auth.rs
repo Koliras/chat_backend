@@ -34,6 +34,13 @@ pub async fn register(
 
     match result {
         Ok(_) => StatusCode::CREATED,
-        Err(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        Err(e) => {
+            if let Some(code) = e.as_database_error().unwrap().code() {
+                if code == "23505" {
+                    return StatusCode::CONFLICT;
+                }
+            }
+            StatusCode::UNPROCESSABLE_ENTITY
+        }
     }
 }
