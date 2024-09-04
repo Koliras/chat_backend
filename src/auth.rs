@@ -7,6 +7,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 
 use crate::AppState;
 
@@ -59,5 +60,46 @@ pub async fn register(
             }
             StatusCode::UNPROCESSABLE_ENTITY.into_response()
         }
+    }
+}
+
+pub struct LoginDto {
+    email: String,
+    password: String,
+}
+
+#[derive(FromRow)]
+pub struct UserEmailAndName {
+    username: String,
+    password: String,
+}
+
+pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<LoginDto>) -> Response {
+    let user = sqlx::query_as::<_, UserEmailAndName>(
+        "SELECT password, username FROM chat.user WHERE email=$1 LIMIT 1",
+    )
+    .bind(&payload.email)
+    .fetch_one(&state.db_pool)
+    .await;
+
+    if let Err(err) = user {
+        return (
+            StatusCode::FORBIDDEN,
+            err.into_database_error().unwrap().message().to_string(),
+        )
+            .into_response();
+    }
+
+    let user = user.unwrap();
+    let is_valid_password = bcrypt::verify(payload.password, &user.password);
+
+    match is_valid_password {
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(valid) if !valid => (
+            StatusCode::UNAUTHORIZED,
+            "User with such email or password doesn't exist",
+        )
+            .into_response(),
+        Ok(_) => StatusCode::OK.into_response(),
     }
 }
