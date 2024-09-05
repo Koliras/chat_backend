@@ -7,6 +7,7 @@ edition = "2021"
 axum = { version = "0.7.5", features = ["ws"] }
 bcrypt = "0.15.1"
 dotenv = "0.15.0"
+jwt-simple = "0.12.10"
 serde = { version = "1.0.209", features = ["derive", "alloc", "rc", "serde_derive"] }
 sqlx = { version = "0.8.1", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.40.0", features = ["full"] }
