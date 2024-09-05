@@ -6,6 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use bcrypt::BcryptResult;
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 
@@ -63,6 +64,7 @@ pub async fn register(
     }
 }
 
+#[derive(Deserialize)]
 pub struct LoginDto {
     email: String,
     password: String,
@@ -75,23 +77,32 @@ pub struct UserEmailAndName {
 }
 
 pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<LoginDto>) -> Response {
-    let user = sqlx::query_as::<_, UserEmailAndName>(
+    let query_result = sqlx::query_as::<_, UserEmailAndName>(
         "SELECT password, username FROM chat.user WHERE email=$1 LIMIT 1",
     )
     .bind(&payload.email)
-    .fetch_one(&state.db_pool)
+    .fetch_optional(&state.db_pool)
     .await;
 
-    if let Err(err) = user {
-        return (
-            StatusCode::FORBIDDEN,
-            err.into_database_error().unwrap().message().to_string(),
-        )
-            .into_response();
+    let user: Option<UserEmailAndName>;
+
+    match query_result {
+        Ok(res) => user = res,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 
-    let user = user.unwrap();
-    let is_valid_password = bcrypt::verify(payload.password, &user.password);
+    let is_valid_password: BcryptResult<bool>;
+
+    match user {
+        Some(user) => is_valid_password = bcrypt::verify(payload.password, &user.password),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                "User with such email or password doesn't exist",
+            )
+                .into_response()
+        }
+    }
 
     match is_valid_password {
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),

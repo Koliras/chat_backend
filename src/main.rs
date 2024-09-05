@@ -12,8 +12,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shared_state = Arc::new(AppState { db_pool });
 
     let app = Router::new()
-        .route("/login", login)
-        .with_state(shared_state)
+        .route("/login", post(login))
         .route("/register", post(register))
         .with_state(shared_state);
 
