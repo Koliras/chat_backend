@@ -1,4 +1,5 @@
 use axum::{routing::post, Router};
+use dotenv::dotenv;
 use std::{error::Error, sync::Arc};
 
 use chat_backend::{
@@ -8,6 +9,8 @@ use chat_backend::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    dotenv().ok();
+
     let db_pool = init_db().await;
     let shared_state = Arc::new(AppState { db_pool });
 
