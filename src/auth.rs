@@ -88,24 +88,24 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
     .fetch_optional(&state.db_pool)
     .await;
 
-    let user: Option<UserEmailAndName>;
+    let is_valid_password: BcryptResult<bool>;
+    let user: UserEmailAndName;
 
     match query_result {
-        Ok(res) => user = res,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
-
-    let is_valid_password: BcryptResult<bool>;
-
-    match user {
-        Some(user) => is_valid_password = bcrypt::verify(payload.password, &user.password),
-        None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                "User with such email or password doesn't exist",
-            )
-                .into_response()
-        }
+        Ok(res) => match res {
+            Some(received_user) => {
+                is_valid_password = bcrypt::verify(payload.password, &received_user.password);
+                user = received_user;
+            }
+            None => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    "User with such email or password doesn't exist",
+                )
+                    .into_response()
+            }
+        },
     }
 
     match is_valid_password {
@@ -115,7 +115,15 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
             "User with such email or password doesn't exist",
         )
             .into_response(),
-        Ok(_) => StatusCode::OK.into_response(),
+        Ok(_) => {
+            let jwt_result =
+                create_jwt_token(user.username, jwt_simple::prelude::Duration::from_mins(10));
+
+            match jwt_result {
+                Ok(token) => return (StatusCode::OK, token).into_response(),
+                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            }
+        }
     }
 }
 
