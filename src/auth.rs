@@ -18,7 +18,7 @@ use crate::AppState;
 
 #[derive(Serialize)]
 pub struct User {
-    id: u64,
+    id: i64,
     username: String,
     password: String,
     email: String,
@@ -75,21 +75,23 @@ pub struct LoginDto {
 }
 
 #[derive(FromRow)]
-pub struct UserEmailAndName {
+pub struct UserPayload {
+    id: i64,
     username: String,
     password: String,
 }
 
 pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<LoginDto>) -> Response {
-    let query_result = sqlx::query_as::<_, UserEmailAndName>(
-        "SELECT password, username FROM chat.user WHERE email=$1 LIMIT 1",
+    let query_result = sqlx::query_as!(
+        UserPayload,
+        "SELECT id, password, username FROM chat.user WHERE email=$1 LIMIT 1",
+        &payload.email,
     )
-    .bind(&payload.email)
     .fetch_optional(&state.db_pool)
     .await;
 
     let is_valid_password: BcryptResult<bool>;
-    let user: UserEmailAndName;
+    let user: UserPayload;
 
     match query_result {
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -116,8 +118,11 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
         )
             .into_response(),
         Ok(_) => {
-            let jwt_result =
-                create_jwt_token(user.username, jwt_simple::prelude::Duration::from_mins(10));
+            let jwt_result = create_jwt_token(
+                user.id,
+                user.username,
+                jwt_simple::prelude::Duration::from_mins(10),
+            );
 
             match jwt_result {
                 Ok(token) => return (StatusCode::OK, token).into_response(),
@@ -129,17 +134,19 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
 
 #[derive(Serialize, Deserialize)]
 struct JwtPayload {
+    id: i64,
     username: String,
 }
 
 fn create_jwt_token(
+    id: i64,
     username: String,
     duration: jwt_simple::prelude::Duration,
 ) -> Result<String, jwt_simple::Error> {
     let key = HS256Key::from_bytes(
         (std::env::var("JWT_SECRET").expect("JWT_SECRET have to be defined")).as_bytes(),
     );
-    let claims = Claims::with_custom_claims(JwtPayload { username }, duration);
+    let claims = Claims::with_custom_claims(JwtPayload { username, id }, duration);
 
     key.authenticate(claims)
 }
