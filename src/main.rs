@@ -7,7 +7,10 @@ use dotenv::dotenv;
 use std::{error::Error, sync::Arc};
 
 use chat_backend::{
-    auth::{get_me, login, register},
+    auth::{
+        authentication::{get_me, login},
+        registration::register,
+    },
     init_db,
     middlewares::jwt_authorization,
     AppState,
