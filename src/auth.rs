@@ -7,14 +7,10 @@ use axum::{
     Json,
 };
 use bcrypt::BcryptResult;
-use jwt_simple::{
-    claims::Claims,
-    prelude::{HS256Key, MACLike},
-};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 
-use crate::AppState;
+use crate::{jwt::create_jwt_token, AppState};
 
 #[derive(Serialize)]
 pub struct User {
@@ -132,21 +128,6 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct JwtPayload {
-    id: i64,
-    username: String,
-}
-
-fn create_jwt_token(
-    id: i64,
-    username: String,
-    duration: jwt_simple::prelude::Duration,
-) -> Result<String, jwt_simple::Error> {
-    let key = HS256Key::from_bytes(
-        (std::env::var("JWT_SECRET").expect("JWT_SECRET have to be defined")).as_bytes(),
-    );
-    let claims = Claims::with_custom_claims(JwtPayload { username, id }, duration);
-
-    key.authenticate(claims)
+pub async fn get_me(State(state): State<Arc<AppState>>) {
+    todo!()
 }
