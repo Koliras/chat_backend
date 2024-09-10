@@ -7,8 +7,10 @@ use dotenv::dotenv;
 use std::{error::Error, sync::Arc};
 
 use chat_backend::{
-    auth::{authorize_current_user, get_me, login, register},
-    init_db, AppState,
+    auth::{get_me, login, register},
+    init_db,
+    middlewares::jwt_authorization,
+    AppState,
 };
 
 #[tokio::main]
@@ -23,8 +25,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/register", post(register))
         .route("/me", get(get_me))
         .route_layer(middleware::from_fn_with_state(
-            shared_state,
-            authorize_current_user,
+            shared_state.clone(),
+            jwt_authorization,
         ))
         .with_state(shared_state);
 

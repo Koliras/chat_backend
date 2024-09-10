@@ -4,7 +4,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
+    Extension, Json,
 };
 use bcrypt::BcryptResult;
 use serde::{Deserialize, Serialize};
@@ -128,6 +128,17 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
     }
 }
 
-pub async fn get_me(State(state): State<Arc<AppState>>) {
-    todo!()
+#[derive(Serialize)]
+pub struct NormalizedUser {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+}
+
+pub async fn get_me(Extension(user): Extension<User>) -> Json<NormalizedUser> {
+    Json(NormalizedUser {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+    })
 }
