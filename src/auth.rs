@@ -12,12 +12,12 @@ use sqlx::prelude::FromRow;
 
 use crate::{jwt::create_jwt_token, AppState};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct User {
-    id: i64,
-    username: String,
-    password: String,
-    email: String,
+    pub id: i64,
+    pub username: String,
+    pub password: String,
+    pub email: String,
 }
 
 #[derive(Deserialize)]

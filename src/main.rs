@@ -1,9 +1,13 @@
-use axum::{routing::post, Router};
+use axum::{
+    middleware,
+    routing::{get, post},
+    Router,
+};
 use dotenv::dotenv;
 use std::{error::Error, sync::Arc};
 
 use chat_backend::{
-    auth::{login, register},
+    auth::{authorize_current_user, get_me, login, register},
     init_db, AppState,
 };
 
@@ -17,6 +21,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = Router::new()
         .route("/login", post(login))
         .route("/register", post(register))
+        .route("/me", get(get_me))
+        .route_layer(middleware::from_fn_with_state(
+            shared_state,
+            authorize_current_user,
+        ))
         .with_state(shared_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
