@@ -95,7 +95,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
 
     let headers = AppendHeaders([(SET_COOKIE, format!("Chat-Refresh={refresh_token}"))]);
 
-    (StatusCode::NO_CONTENT, headers, access_token).into_response()
+    (StatusCode::OK, headers, access_token).into_response()
 }
 
 #[derive(Serialize)]
