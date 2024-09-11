@@ -34,7 +34,7 @@ pub fn routes(shared_state: Arc<AppState>) -> Router<Arc<AppState>> {
             )),
         )
         .route(
-            "/auth/password",
+            "/auth/change-password",
             patch(change_password).layer(middleware::from_fn_with_state(
                 shared_state.clone(),
                 jwt_authorization,
