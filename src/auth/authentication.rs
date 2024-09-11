@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use axum::{
     extract::State,
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    http::{header::SET_COOKIE, StatusCode},
+    response::{AppendHeaders, IntoResponse, Response},
     Extension, Json,
 };
 use bcrypt::BcryptResult;
@@ -56,26 +56,46 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
         },
     }
 
-    match is_valid_password {
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        Ok(valid) if !valid => (
+    let is_valid = if let Ok(valid) = is_valid_password {
+        valid
+    } else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    if !is_valid {
+        return (
             StatusCode::UNAUTHORIZED,
             "User with such email or password doesn't exist",
         )
-            .into_response(),
-        Ok(_) => {
-            let jwt_result = create_jwt_token(
-                user.id,
-                user.username,
-                jwt_simple::prelude::Duration::from_mins(10),
-            );
-
-            match jwt_result {
-                Ok(token) => return (StatusCode::OK, token).into_response(),
-                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            }
-        }
+            .into_response();
     }
+
+    let access_token = create_jwt_token(
+        user.id,
+        user.username.clone(),
+        jwt_simple::prelude::Duration::from_mins(10),
+    );
+
+    let access_token = if let Ok(token) = access_token {
+        token
+    } else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let refresh_token = create_jwt_token(
+        user.id,
+        user.username,
+        jwt_simple::prelude::Duration::from_days(3),
+    );
+    let refresh_token = if let Ok(token) = refresh_token {
+        token
+    } else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let headers = AppendHeaders([(SET_COOKIE, format!("Chat-Refresh={refresh_token}"))]);
+
+    (StatusCode::NO_CONTENT, headers, access_token).into_response()
 }
 
 #[derive(Serialize)]
