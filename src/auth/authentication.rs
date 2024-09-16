@@ -12,7 +12,7 @@ use sqlx::prelude::FromRow;
 
 use crate::AppState;
 
-use super::{jwt::create_jwt_token, User};
+use super::{jwt::create_jwt_token, registration::User};
 
 #[derive(Deserialize)]
 pub struct LoginDto {

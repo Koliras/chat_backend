@@ -8,7 +8,7 @@ use axum::{
 };
 
 use crate::{
-    auth::{jwt::decode_jwt_payload, User},
+    auth::{jwt::decode_jwt_payload, registration::User},
     AppState,
 };
 

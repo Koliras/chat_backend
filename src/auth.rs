@@ -7,21 +7,12 @@ use axum::{
     Router,
 };
 use registration::{change_password, register};
-use serde::Serialize;
 
 use crate::{middlewares::jwt_authorization, AppState};
 
 pub mod authentication;
 pub mod jwt;
 pub mod registration;
-
-#[derive(Serialize, Clone)]
-pub struct User {
-    pub id: i64,
-    pub username: String,
-    pub password: String,
-    pub email: String,
-}
 
 pub fn routes(shared_state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()

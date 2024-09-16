@@ -6,11 +6,17 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 
-use super::User;
+#[derive(Serialize, Clone)]
+pub struct User {
+    pub id: i64,
+    pub username: String,
+    pub password: String,
+    pub email: String,
+}
 
 #[derive(Deserialize)]
 pub struct RegisterUser {
