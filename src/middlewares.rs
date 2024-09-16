@@ -7,7 +7,10 @@ use axum::{
     response::Response,
 };
 
-use crate::{auth::User, jwt::decode_jwt_payload, AppState};
+use crate::{
+    auth::{jwt::decode_jwt_payload, User},
+    AppState,
+};
 
 pub async fn jwt_authorization(
     State(state): State<Arc<AppState>>,

@@ -1,7 +1,6 @@
 use sqlx::{Pool, Postgres};
 
 pub mod auth;
-pub mod jwt;
 pub mod middlewares;
 
 pub struct AppState {

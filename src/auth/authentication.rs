@@ -10,9 +10,9 @@ use bcrypt::BcryptResult;
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 
-use crate::{jwt::create_jwt_token, AppState};
+use crate::AppState;
 
-use super::User;
+use super::{jwt::create_jwt_token, User};
 
 #[derive(Deserialize)]
 pub struct LoginDto {

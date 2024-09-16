@@ -12,6 +12,7 @@ use serde::Serialize;
 use crate::{middlewares::jwt_authorization, AppState};
 
 pub mod authentication;
+pub mod jwt;
 pub mod registration;
 
 #[derive(Serialize, Clone)]
