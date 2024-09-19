@@ -2,7 +2,7 @@ use axum::Router;
 use dotenv::dotenv;
 use std::{error::Error, sync::Arc};
 
-use chat_backend::{auth, init_db, AppState};
+use chat_backend::{auth, chat, init_db, AppState};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -13,6 +13,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let app = Router::new()
         .merge(auth::routes(shared_state.clone()))
+        .merge(chat::routes(shared_state.clone()))
         .with_state(shared_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
