@@ -71,6 +71,7 @@ pub async fn create_chat(
 #[derive(FromRow, Serialize)]
 pub struct Chat {
     name: String,
+    chat_id: i64,
     admin_username: String,
 }
 
@@ -81,7 +82,7 @@ pub async fn get_chats(
     let query_result = sqlx::query_as!(
         Chat,
         "
-        SELECT c.name AS name, u.username AS admin_username
+        SELECT c.name AS name, c.id AS chat_id, u.username AS admin_username
         FROM chat.user_chat AS uc
         INNER JOIN chat.chat AS c
         ON uc.chat_id = c.id
