@@ -111,35 +111,42 @@ pub async fn delete_chat(
     Json(payload): Json<DeleteChatPayload>,
 ) -> Response {
     struct ChatId {
-        id: Option<i64>,
+        admin_id: Option<i64>,
     }
+
+    let query_result = sqlx::query_as!(
+        ChatId,
+        "SELECT admin_id FROM chat.chat WHERE id = $1;",
+        payload.chat_id,
+    )
+    .fetch_one(&state.db_pool)
+    .await;
+
+    if let Ok(a) = query_result {
+        match a.admin_id {
+            Some(id) if id != user.id => {
+                return (
+                    StatusCode::FORBIDDEN,
+                    "Only admin of this chat can delete it",
+                )
+                    .into_response();
+            }
+            Some(_) => {}
+            None => {
+                return (StatusCode::NOT_FOUND, "Could not find chat with such an id")
+                    .into_response()
+            }
+        }
+    } else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not find chat").into_response();
+    };
+
     let tx = state.db_pool.begin().await;
     let mut tx = match tx {
         Ok(transaction) => transaction,
         Err(_) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Could not delete chat").into_response();
         }
-    };
-
-    let deletion_result = sqlx::query_as!(
-        ChatId,
-        "DELETE FROM chat.chat WHERE id = $1 AND admin_id = $2 RETURNING id;",
-        payload.chat_id,
-        user.id
-    )
-    .fetch_one(&mut *tx)
-    .await;
-
-    if let Ok(a) = deletion_result {
-        if a.id.is_none() {
-            return (
-                StatusCode::NOT_FOUND,
-                "Could not find chat with such an id or you are not an admin of this chat",
-            )
-                .into_response();
-        }
-    } else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not find chat").into_response();
     };
 
     let deletion_result = sqlx::query!(
@@ -164,12 +171,22 @@ pub async fn delete_chat(
     .execute(&mut *tx)
     .await;
 
-    match deletion_result {
-        Err(_) => (
+    if let Err(_) = deletion_result {
+        return (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Could not delete chat messages",
         )
-            .into_response(),
+            .into_response();
+    }
+
+    let deletion_result = sqlx::query("DELETE FROM chat.chat WHERE id = $1 AND admin_id = $2;")
+        .bind(payload.chat_id)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await;
+
+    match deletion_result {
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Could not delete chat").into_response(),
         Ok(_) => {
             let commit_result = tx.commit().await;
             match commit_result {
