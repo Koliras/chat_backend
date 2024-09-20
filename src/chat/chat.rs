@@ -16,16 +16,15 @@ pub struct CreateChat {
     name: String,
 }
 
-#[derive(FromRow)]
-pub struct ChatId {
-    id: i64,
-}
-
 pub async fn create_chat(
     Extension(user): Extension<User>,
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateChat>,
 ) -> Response {
+    struct ChatId {
+        id: i64,
+    }
+
     let tx = state.db_pool.begin().await;
     let mut tx = match tx {
         Ok(transaction) => transaction,
