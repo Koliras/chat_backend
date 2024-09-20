@@ -99,3 +99,87 @@ pub async fn get_chats(
         Err(_) => (StatusCode::NOT_FOUND, "Could not find any chats").into_response(),
     }
 }
+
+#[derive(Deserialize)]
+pub struct DeleteChatPayload {
+    chat_id: i64,
+}
+
+pub async fn delete_chat(
+    Extension(user): Extension<User>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<DeleteChatPayload>,
+) -> Response {
+    struct ChatId {
+        id: Option<i64>,
+    }
+    let tx = state.db_pool.begin().await;
+    let mut tx = match tx {
+        Ok(transaction) => transaction,
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Could not delete chat").into_response();
+        }
+    };
+
+    let deletion_result = sqlx::query_as!(
+        ChatId,
+        "DELETE FROM chat.chat WHERE id = $1 AND admin_id = $2 RETURNING id;",
+        payload.chat_id,
+        user.id
+    )
+    .fetch_one(&mut *tx)
+    .await;
+
+    if let Ok(a) = deletion_result {
+        if a.id.is_none() {
+            return (
+                StatusCode::NOT_FOUND,
+                "Could not find chat with such an id or you are not an admin of this chat",
+            )
+                .into_response();
+        }
+    } else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not find chat").into_response();
+    };
+
+    let deletion_result = sqlx::query!(
+        "DELETE FROM chat.user_chat WHERE chat_id = $1;",
+        payload.chat_id
+    )
+    .execute(&mut *tx)
+    .await;
+
+    if let Err(_) = deletion_result {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not delete users of chat",
+        )
+            .into_response();
+    }
+
+    let deletion_result = sqlx::query!(
+        "DELETE FROM chat.message WHERE chat_id = $1;",
+        payload.chat_id
+    )
+    .execute(&mut *tx)
+    .await;
+
+    match deletion_result {
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not delete chat messages",
+        )
+            .into_response(),
+        Ok(_) => {
+            let commit_result = tx.commit().await;
+            match commit_result {
+                Err(_) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Could not delete chat and other related entities",
+                )
+                    .into_response(),
+                Ok(_) => StatusCode::NO_CONTENT.into_response(),
+            }
+        }
+    }
+}
