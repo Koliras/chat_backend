@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Extension, Json,
@@ -100,15 +100,10 @@ pub async fn get_chats(
     }
 }
 
-#[derive(Deserialize)]
-pub struct DeleteChatPayload {
-    chat_id: i64,
-}
-
 pub async fn delete_chat(
+    Path(chat_id): Path<i64>,
     Extension(user): Extension<User>,
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<DeleteChatPayload>,
 ) -> Response {
     struct ChatId {
         admin_id: Option<i64>,
@@ -117,7 +112,7 @@ pub async fn delete_chat(
     let query_result = sqlx::query_as!(
         ChatId,
         "SELECT admin_id FROM chat.chat WHERE id = $1;",
-        payload.chat_id,
+        chat_id,
     )
     .fetch_one(&state.db_pool)
     .await;
@@ -149,12 +144,9 @@ pub async fn delete_chat(
         }
     };
 
-    let deletion_result = sqlx::query!(
-        "DELETE FROM chat.user_chat WHERE chat_id = $1;",
-        payload.chat_id
-    )
-    .execute(&mut *tx)
-    .await;
+    let deletion_result = sqlx::query!("DELETE FROM chat.user_chat WHERE chat_id = $1;", chat_id)
+        .execute(&mut *tx)
+        .await;
 
     if let Err(_) = deletion_result {
         return (
@@ -164,12 +156,9 @@ pub async fn delete_chat(
             .into_response();
     }
 
-    let deletion_result = sqlx::query!(
-        "DELETE FROM chat.message WHERE chat_id = $1;",
-        payload.chat_id
-    )
-    .execute(&mut *tx)
-    .await;
+    let deletion_result = sqlx::query!("DELETE FROM chat.message WHERE chat_id = $1;", chat_id)
+        .execute(&mut *tx)
+        .await;
 
     if let Err(_) = deletion_result {
         return (
@@ -180,7 +169,7 @@ pub async fn delete_chat(
     }
 
     let deletion_result = sqlx::query("DELETE FROM chat.chat WHERE id = $1 AND admin_id = $2;")
-        .bind(payload.chat_id)
+        .bind(chat_id)
         .bind(user.id)
         .execute(&mut *tx)
         .await;
