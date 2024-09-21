@@ -91,5 +91,37 @@ pub async fn change_email(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<ChangeEmail>,
 ) -> Response {
-    todo!()
+    if user.email == payload.new_email {
+        return (
+            StatusCode::BAD_REQUEST,
+            "New email cannot be the same as the old one",
+        )
+            .into_response();
+    }
+
+    if user.email.len() == 0 {
+        return (StatusCode::BAD_REQUEST, "New email cannot be empty").into_response();
+    }
+
+    let update_result = sqlx::query!(
+        "UPDATE chat.user SET email = $1 WHERE id = $2",
+        payload.new_email,
+        user.id
+    )
+    .execute(&state.db_pool)
+    .await;
+
+    match update_result {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => match err {
+            sqlx::Error::Database(e) if e.is_unique_violation() => {
+                (StatusCode::BAD_REQUEST, "This email is already used").into_response()
+            }
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not change your email due to internal reasons",
+            )
+                .into_response(),
+        },
+    }
 }
