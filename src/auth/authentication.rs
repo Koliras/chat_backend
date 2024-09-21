@@ -8,11 +8,10 @@ use axum::{
 };
 use bcrypt::BcryptResult;
 use serde::{Deserialize, Serialize};
-use sqlx::prelude::FromRow;
 
-use crate::{jwt::create_jwt_token, AppState};
+use crate::AppState;
 
-use super::User;
+use super::{jwt::create_jwt_token, registration::User};
 
 #[derive(Deserialize)]
 pub struct LoginDto {
@@ -20,14 +19,12 @@ pub struct LoginDto {
     password: String,
 }
 
-#[derive(FromRow)]
-pub struct UserPayload {
-    id: i64,
-    username: String,
-    password: String,
-}
-
 pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<LoginDto>) -> Response {
+    pub struct UserPayload {
+        id: i64,
+        username: String,
+        password: String,
+    }
     let query_result = sqlx::query_as!(
         UserPayload,
         "SELECT id, password, username FROM chat.user WHERE email=$1 LIMIT 1",
