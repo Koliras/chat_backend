@@ -25,11 +25,12 @@ pub struct RegisterUser {
     email: String,
 }
 
-pub trait ValidPassword {
+pub trait Validity {
     fn is_valid_password(&self) -> Result<(), String>;
+    fn is_valid_email(&self) -> bool;
 }
 
-impl ValidPassword for String {
+impl Validity for String {
     fn is_valid_password(&self) -> Result<(), String> {
         if self.len() < 8 {
             return Err(
@@ -74,15 +75,57 @@ impl ValidPassword for String {
 
         Ok(())
     }
+
+    fn is_valid_email(&self) -> bool {
+        if self.len() < 6 {
+            return false;
+        }
+        for c in self.chars() {
+            if !c.is_ascii() {
+                return false;
+            }
+        }
+
+        let split_email: Vec<&str> = self.split("@").collect();
+        if split_email.len() != 2 {
+            return false;
+        }
+
+        let domain = split_email[1];
+        if domain.len() < 4 {
+            return false;
+        }
+
+        let split_domain: Vec<&str> = domain.split(".").collect();
+        if split_domain.len() != 2 {
+            return false;
+        }
+
+        if split_domain[0].len() == 0 || split_domain[1].len() < 2 {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterUser>,
 ) -> Response {
+    if payload.username.len() < 3 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Your email should be at least 3 characters long",
+        )
+            .into_response();
+    }
+    if !payload.email.is_valid_email() {
+        return (StatusCode::BAD_REQUEST, "Invalid email").into_response();
+    }
     match payload.password.is_valid_password() {
         Ok(_) => {}
-        Err(message) => return (StatusCode::FORBIDDEN, message).into_response(),
+        Err(message) => return (StatusCode::BAD_REQUEST, message).into_response(),
     }
     let pass_encrypt_res = bcrypt::hash(payload.password.as_bytes(), 10);
     let password: String;

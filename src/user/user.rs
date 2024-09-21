@@ -9,7 +9,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    auth::registration::{User, ValidPassword},
+    auth::registration::{User, Validity},
     AppState,
 };
 
@@ -99,8 +99,8 @@ pub async fn change_email(
             .into_response();
     }
 
-    if user.email.len() == 0 {
-        return (StatusCode::BAD_REQUEST, "New email cannot be empty").into_response();
+    if !payload.new_email.is_valid_email() {
+        return (StatusCode::BAD_REQUEST, "Your new email is invalid").into_response();
     }
 
     let update_result = sqlx::query!(
