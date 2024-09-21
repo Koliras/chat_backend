@@ -133,7 +133,11 @@ pub async fn change_password(
     let is_same = if let Ok(same) = is_same {
         same
     } else {
-        return StatusCode::FORBIDDEN.into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not change password due to internal reasons",
+        )
+            .into_response();
     };
 
     if !is_same {
@@ -149,12 +153,17 @@ pub async fn change_password(
     }
 
     let pass_encrypt_res = bcrypt::hash(&payload.new_password.as_bytes(), 10);
-    let password: String;
 
-    match pass_encrypt_res {
-        Ok(hash) => password = hash,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    let password = match pass_encrypt_res {
+        Ok(hash) => hash,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not change password due to internal reasons",
+            )
+                .into_response();
+        }
+    };
 
     let result = sqlx::query("UPDATE chat.user SET password=$1 WHERE id=$2")
         .bind(password)
