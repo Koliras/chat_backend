@@ -7,6 +7,7 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::error::ErrorKind;
 
 use crate::AppState;
 
@@ -51,18 +52,18 @@ pub async fn register(
 
     match result {
         Ok(_) => StatusCode::CREATED.into_response(),
-        Err(e) => {
-            if let Some(code) = e.as_database_error().unwrap().code() {
-                if code == "23505" {
-                    return (
-                        StatusCode::CONFLICT,
-                        "User with such nickname or email already exists",
-                    )
-                        .into_response();
-                }
-            }
-            StatusCode::UNPROCESSABLE_ENTITY.into_response()
-        }
+        Err(e) => match e {
+            sqlx::Error::Database(err) if err.is_unique_violation() => (
+                StatusCode::CONFLICT,
+                "User with such nickname or email already exists",
+            )
+                .into_response(),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not register you due to internal reasons",
+            )
+                .into_response(),
+        },
     }
 }
 
