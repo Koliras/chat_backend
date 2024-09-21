@@ -125,3 +125,52 @@ pub async fn change_email(
         },
     }
 }
+
+#[derive(Deserialize)]
+pub struct ChangeUsername {
+    new_username: String,
+}
+
+pub async fn change_username(
+    Extension(user): Extension<User>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<ChangeUsername>,
+) -> Response {
+    if user.username == payload.new_username {
+        return (
+            StatusCode::BAD_REQUEST,
+            "New username cannot be the same as the old one",
+        )
+            .into_response();
+    }
+
+    if payload.new_username.len() < 3 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "New username has to be at least 3 characters long",
+        )
+            .into_response();
+    }
+
+    let update_result = sqlx::query!(
+        "UPDATE chat.user SET username = $1 WHERE id = $2",
+        payload.new_username,
+        user.id
+    )
+    .execute(&state.db_pool)
+    .await;
+
+    match update_result {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => match err {
+            sqlx::Error::Database(e) if e.is_unique_violation() => {
+                (StatusCode::BAD_REQUEST, "This username is already used").into_response()
+            }
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not change your username due to internal reasons",
+            )
+                .into_response(),
+        },
+    }
+}

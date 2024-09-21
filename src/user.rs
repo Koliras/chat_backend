@@ -11,6 +11,7 @@ pub fn routes(shared_state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
         .route("/user/change-password", patch(change_password))
         .route("/user/change-email", patch(change_email))
+        .route("/user/change-username", patch(change_username))
         .layer(middleware::from_fn_with_state(
             shared_state.clone(),
             jwt_authorization,
