@@ -27,14 +27,11 @@ impl User {
             "SELECT admin_id FROM chat.chat WHERE id = $1;",
             chat_id,
         )
-        .fetch_optional(executor)
+        .fetch_one(executor)
         .await?;
 
-        match admin_id {
-            Some(val) => match val.admin_id {
-                Some(id) => Ok(id == self.id),
-                None => Err(sqlx::Error::RowNotFound),
-            },
+        match admin_id.admin_id {
+            Some(id) => Ok(id == self.id),
             None => Err(sqlx::Error::RowNotFound),
         }
     }
@@ -87,7 +84,11 @@ pub async fn create_chat(
             .await;
 
     if let Err(_) = insertion_result {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not create chat").into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not add you to the chat",
+        )
+            .into_response();
     }
 
     let tx_result = tx.commit().await;
@@ -127,7 +128,16 @@ pub async fn get_chats(
 
     match query_result {
         Ok(chats) => (StatusCode::OK, Json(chats)).into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, "Could not find any chats").into_response(),
+        Err(err) => match err {
+            sqlx::Error::RowNotFound => {
+                (StatusCode::NOT_FOUND, "Could not find any chats").into_response()
+            }
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not find any chats due to internal reasons. Please, try once more",
+            )
+                .into_response(),
+        },
     }
 }
 
