@@ -7,7 +7,6 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::error::ErrorKind;
 
 use crate::AppState;
 
