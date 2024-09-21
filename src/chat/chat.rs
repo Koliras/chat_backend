@@ -7,13 +7,37 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::prelude::FromRow;
+use sqlx::{prelude::FromRow, Postgres, Result};
 
 use crate::{auth::registration::User, AppState};
 
 #[derive(Deserialize)]
 pub struct CreateChat {
     name: String,
+}
+
+impl User {
+    async fn is_admin(&self, executor: &sqlx::Pool<Postgres>, chat_id: i64) -> sqlx::Result<bool> {
+        struct AdminId {
+            admin_id: Option<i64>,
+        }
+
+        let admin_id = sqlx::query_as!(
+            AdminId,
+            "SELECT admin_id FROM chat.chat WHERE id = $1;",
+            chat_id,
+        )
+        .fetch_optional(executor)
+        .await?;
+
+        match admin_id {
+            Some(val) => match val.admin_id {
+                Some(id) => Ok(id == self.id),
+                None => Err(sqlx::Error::RowNotFound),
+            },
+            None => Err(sqlx::Error::RowNotFound),
+        }
+    }
 }
 
 pub async fn create_chat(
@@ -112,36 +136,28 @@ pub async fn delete_chat(
     Extension(user): Extension<User>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    struct AdminId {
-        admin_id: Option<i64>,
-    }
+    let is_chat_admin = user.is_admin(&state.db_pool, chat_id).await;
 
-    let query_result = sqlx::query_as!(
-        AdminId,
-        "SELECT admin_id FROM chat.chat WHERE id = $1;",
-        chat_id,
-    )
-    .fetch_one(&state.db_pool)
-    .await;
-
-    if let Ok(a) = query_result {
-        match a.admin_id {
-            Some(id) if id != user.id => {
-                return (
-                    StatusCode::FORBIDDEN,
-                    "Only admin of this chat can delete it",
-                )
-                    .into_response();
-            }
-            Some(_) => {}
-            None => {
+    match is_chat_admin {
+        Err(err) => match err {
+            sqlx::Error::RowNotFound => {
                 return (StatusCode::NOT_FOUND, "Could not find chat with such an id")
                     .into_response()
             }
+            _ => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Could not find chat due to internal reasons",
+                )
+                    .into_response()
+            }
+        },
+        Ok(is_admin) => {
+            if !is_admin {
+                return (StatusCode::FORBIDDEN, "Only admin can delete the chat").into_response();
+            }
         }
-    } else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not find chat").into_response();
-    };
+    }
 
     let tx = state.db_pool.begin().await;
     let mut tx = match tx {
@@ -215,36 +231,33 @@ pub async fn rename_chat(
         )
             .into_response();
     }
-    struct AdminId {
-        admin_id: Option<i64>,
-    }
 
-    let query_result = sqlx::query_as!(
-        AdminId,
-        "SELECT admin_id FROM chat.chat WHERE id = $1;",
-        chat_id,
-    )
-    .fetch_one(&state.db_pool)
-    .await;
+    let is_chat_admin = user.is_admin(&state.db_pool, chat_id).await;
 
-    if let Ok(a) = query_result {
-        match a.admin_id {
-            Some(id) if id != user.id => {
+    match is_chat_admin {
+        Err(err) => match err {
+            sqlx::Error::RowNotFound => {
+                return (StatusCode::NOT_FOUND, "Could not find chat with such an id")
+                    .into_response()
+            }
+            _ => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Could not find chat due to internal problems",
+                )
+                    .into_response()
+            }
+        },
+        Ok(is_admin) => {
+            if !is_admin {
                 return (
                     StatusCode::FORBIDDEN,
                     "Only admin of this chat can change its name",
                 )
                     .into_response();
             }
-            Some(_) => {}
-            None => {
-                return (StatusCode::NOT_FOUND, "Could not find chat with such an id")
-                    .into_response()
-            }
         }
-    } else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not find chat").into_response();
-    };
+    }
 
     let insert_result = sqlx::query!(
         "UPDATE chat.chat SET name = $1 WHERE id = $2",
