@@ -7,7 +7,7 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, Postgres, Result};
+use sqlx::{prelude::FromRow, Postgres};
 
 use crate::{auth::registration::User, AppState};
 
