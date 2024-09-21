@@ -19,7 +19,7 @@ pub struct CreateChat {
 impl User {
     async fn is_admin(&self, executor: &sqlx::Pool<Postgres>, chat_id: i64) -> sqlx::Result<bool> {
         struct AdminId {
-            admin_id: Option<i64>,
+            admin_id: i64,
         }
 
         let admin_id = sqlx::query_as!(
@@ -30,10 +30,7 @@ impl User {
         .fetch_one(executor)
         .await?;
 
-        match admin_id.admin_id {
-            Some(id) => Ok(id == self.id),
-            None => Err(sqlx::Error::RowNotFound),
-        }
+        Ok(admin_id.admin_id == self.id)
     }
 }
 
