@@ -21,6 +21,13 @@ pub async fn create_chat(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateChat>,
 ) -> Response {
+    if payload.name.len() < 3 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Chat name should be at least 3 characters long",
+        )
+            .into_response();
+    }
     struct ChatId {
         id: i64,
     }
@@ -105,12 +112,12 @@ pub async fn delete_chat(
     Extension(user): Extension<User>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    struct ChatId {
+    struct AdminId {
         admin_id: Option<i64>,
     }
 
     let query_result = sqlx::query_as!(
-        ChatId,
+        AdminId,
         "SELECT admin_id FROM chat.chat WHERE id = $1;",
         chat_id,
     )
@@ -187,5 +194,72 @@ pub async fn delete_chat(
                 Ok(_) => StatusCode::NO_CONTENT.into_response(),
             }
         }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RenameChat {
+    new_name: String,
+}
+
+pub async fn rename_chat(
+    Path(chat_id): Path<i64>,
+    Extension(user): Extension<User>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<RenameChat>,
+) -> Response {
+    if payload.new_name.len() < 3 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Chat name should be at least 3 characters long",
+        )
+            .into_response();
+    }
+    struct AdminId {
+        admin_id: Option<i64>,
+    }
+
+    let query_result = sqlx::query_as!(
+        AdminId,
+        "SELECT admin_id FROM chat.chat WHERE id = $1;",
+        chat_id,
+    )
+    .fetch_one(&state.db_pool)
+    .await;
+
+    if let Ok(a) = query_result {
+        match a.admin_id {
+            Some(id) if id != user.id => {
+                return (
+                    StatusCode::FORBIDDEN,
+                    "Only admin of this chat can change its name",
+                )
+                    .into_response();
+            }
+            Some(_) => {}
+            None => {
+                return (StatusCode::NOT_FOUND, "Could not find chat with such an id")
+                    .into_response()
+            }
+        }
+    } else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not find chat").into_response();
+    };
+
+    let insert_result = sqlx::query!(
+        "UPDATE chat.chat SET name = $1 WHERE id = $2",
+        payload.new_name,
+        chat_id
+    )
+    .execute(&state.db_pool)
+    .await;
+
+    match insert_result {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not update chat name",
+        )
+            .into_response(),
     }
 }
