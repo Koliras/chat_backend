@@ -16,10 +16,10 @@ pub mod registration;
 
 pub fn routes(shared_state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
-        .route("/auth/login", post(login))
-        .route("/auth/register", post(register))
+        .route("/login", post(login))
+        .route("/register", post(register))
         .route(
-            "/auth/me",
+            "/me",
             get(get_me).layer(middleware::from_fn_with_state(
                 shared_state.clone(),
                 jwt_authorization,

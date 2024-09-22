@@ -12,9 +12,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shared_state = Arc::new(AppState { db_pool });
 
     let app = Router::new()
-        .merge(auth::routes(shared_state.clone()))
-        .merge(chat::routes(shared_state.clone()))
-        .merge(user::routes(shared_state.clone()))
+        .nest("/auth", auth::routes(shared_state.clone()))
+        .nest("/chat", chat::routes(shared_state.clone()))
+        .nest("/user", user::routes(shared_state.clone()))
         .with_state(shared_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();

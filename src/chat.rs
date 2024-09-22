@@ -14,9 +14,9 @@ pub mod chat;
 
 pub fn routes(shared_state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
-        .route("/chat", get(get_chats).post(create_chat))
-        .route("/chat/:chat_id", delete(delete_chat).patch(rename_chat))
-        .layer(middleware::from_fn_with_state(
+        .route("/", get(get_chats).post(create_chat))
+        .route("/:chat_id", delete(delete_chat).patch(rename_chat))
+        .route_layer(middleware::from_fn_with_state(
             shared_state.clone(),
             jwt_authorization,
         ))
