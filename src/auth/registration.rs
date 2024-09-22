@@ -4,10 +4,9 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Extension, Json,
+    Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::error::ErrorKind;
 
 use crate::AppState;
 
@@ -26,13 +25,107 @@ pub struct RegisterUser {
     email: String,
 }
 
+pub trait Validity {
+    fn is_valid_password(&self) -> Result<(), String>;
+    fn is_valid_email(&self) -> bool;
+}
+
+impl Validity for String {
+    fn is_valid_password(&self) -> Result<(), String> {
+        if self.len() < 8 {
+            return Err(
+                "This password is too short. It has to be at least 8 characters long.".to_string(),
+            );
+        }
+        let mut contains_numbers = false;
+        let mut contains_uppercase = false;
+        let mut contains_lowercase = false;
+        let mut contains_symbol = false;
+
+        for char in self.chars() {
+            if char.is_numeric() {
+                contains_numbers = true;
+            }
+
+            if char.is_uppercase() {
+                contains_uppercase = true;
+            }
+
+            if char.is_lowercase() {
+                contains_lowercase = true;
+            }
+
+            if !char.is_alphabetic() && !char.is_numeric() {
+                contains_symbol = true;
+            }
+        }
+
+        if !contains_numbers {
+            return Err("Password has to contain at least one digit.".to_string());
+        }
+        if !contains_uppercase {
+            return Err("Password has to contain at least one uppercase letter.".to_string());
+        }
+        if !contains_lowercase {
+            return Err("Password has to contain at least one lowercase letter.".to_string());
+        }
+        if !contains_symbol {
+            return Err("Password has to contain at least one special symbol.".to_string());
+        }
+
+        Ok(())
+    }
+
+    fn is_valid_email(&self) -> bool {
+        if self.len() < 6 {
+            return false;
+        }
+        for c in self.chars() {
+            if !c.is_ascii() {
+                return false;
+            }
+        }
+
+        let split_email: Vec<&str> = self.split("@").collect();
+        if split_email.len() != 2 {
+            return false;
+        }
+
+        let domain = split_email[1];
+        if domain.len() < 4 {
+            return false;
+        }
+
+        let split_domain: Vec<&str> = domain.split(".").collect();
+        if split_domain.len() != 2 {
+            return false;
+        }
+
+        if split_domain[0].len() == 0 || split_domain[1].len() < 2 {
+            return false;
+        }
+
+        return true;
+    }
+}
+
 pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterUser>,
 ) -> Response {
-    match validate_password(&payload.password) {
+    if payload.username.len() < 3 {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Your email should be at least 3 characters long",
+        )
+            .into_response();
+    }
+    if !payload.email.is_valid_email() {
+        return (StatusCode::BAD_REQUEST, "Invalid email").into_response();
+    }
+    match payload.password.is_valid_password() {
         Ok(_) => {}
-        Err(message) => return (StatusCode::FORBIDDEN, message).into_response(),
+        Err(message) => return (StatusCode::BAD_REQUEST, message).into_response(),
     }
     let pass_encrypt_res = bcrypt::hash(payload.password.as_bytes(), 10);
     let password: String;
@@ -64,119 +157,5 @@ pub async fn register(
             )
                 .into_response(),
         },
-    }
-}
-
-fn validate_password(pass: &str) -> Result<(), String> {
-    if pass.len() < 8 {
-        return Err(
-            "This password is too short. It has to be at least 8 characters long.".to_string(),
-        );
-    }
-    let mut contains_numbers = false;
-    let mut contains_uppercase = false;
-    let mut contains_lowercase = false;
-    let mut contains_symbol = false;
-
-    for char in pass.chars() {
-        if char.is_numeric() {
-            contains_numbers = true;
-        }
-
-        if char.is_uppercase() {
-            contains_uppercase = true;
-        }
-
-        if char.is_lowercase() {
-            contains_lowercase = true;
-        }
-
-        if !char.is_alphabetic() && !char.is_numeric() {
-            contains_symbol = true;
-        }
-    }
-
-    if !contains_numbers {
-        return Err("Password has to contain at least one digit.".to_string());
-    }
-    if !contains_uppercase {
-        return Err("Password has to contain at least one uppercase letter.".to_string());
-    }
-    if !contains_lowercase {
-        return Err("Password has to contain at least one lowercase letter.".to_string());
-    }
-    if !contains_symbol {
-        return Err("Password has to contain at least one special symbol.".to_string());
-    }
-
-    Ok(())
-}
-
-#[derive(Deserialize)]
-pub struct ChangePassword {
-    new_password: String,
-    old_password: String,
-}
-
-pub async fn change_password(
-    Extension(user): Extension<User>,
-    State(state): State<Arc<AppState>>,
-    Json(payload): Json<ChangePassword>,
-) -> Response {
-    match validate_password(&payload.new_password) {
-        Ok(_) => {}
-        Err(message) => return (StatusCode::FORBIDDEN, message).into_response(),
-    }
-
-    let is_same = bcrypt::verify(&payload.old_password, &user.password);
-
-    let is_same = if let Ok(same) = is_same {
-        same
-    } else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not change password due to internal reasons",
-        )
-            .into_response();
-    };
-
-    if !is_same {
-        return (StatusCode::FORBIDDEN, "Password isn't correct.").into_response();
-    }
-
-    if &payload.old_password == &payload.new_password {
-        return (
-            StatusCode::FORBIDDEN,
-            "New password cannot be the same as the old one.",
-        )
-            .into_response();
-    }
-
-    let pass_encrypt_res = bcrypt::hash(&payload.new_password.as_bytes(), 10);
-
-    let password = match pass_encrypt_res {
-        Ok(hash) => hash,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not change password due to internal reasons",
-            )
-                .into_response();
-        }
-    };
-
-    let result = sqlx::query("UPDATE chat.user SET password=$1 WHERE id=$2")
-        .bind(password)
-        .bind(user.id)
-        .execute(&state.db_pool)
-        .await;
-
-    match result {
-        Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not update the password.".to_string(),
-        )
-            .into_response(),
     }
 }

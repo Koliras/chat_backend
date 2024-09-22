@@ -3,6 +3,7 @@ use sqlx::{Pool, Postgres};
 pub mod auth;
 pub mod chat;
 pub mod middlewares;
+pub mod user;
 
 pub struct AppState {
     pub db_pool: Pool<Postgres>,
