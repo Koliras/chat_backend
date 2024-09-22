@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{middleware, routing::patch, Router};
-use user::{change_email, change_password};
+use user::{change_email, change_password, change_username};
 
 use crate::{middlewares::jwt_authorization, AppState};
 
