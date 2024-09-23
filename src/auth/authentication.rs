@@ -8,6 +8,7 @@ use axum::{
 };
 use bcrypt::BcryptResult;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Uuid;
 
 use crate::AppState;
 
@@ -21,7 +22,7 @@ pub struct LoginDto {
 
 pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<LoginDto>) -> Response {
     pub struct UserPayload {
-        id: i64,
+        id: Uuid,
         username: String,
         password: String,
     }
@@ -97,7 +98,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
 
 #[derive(Serialize)]
 pub struct NormalizedUser {
-    pub id: i64,
+    pub id: Uuid,
     pub username: String,
     pub email: String,
 }

@@ -3,15 +3,16 @@ use jwt_simple::{
     prelude::{HS256Key, MACLike},
 };
 use serde::{Deserialize, Serialize};
+use sqlx::types::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct JwtPayload {
-    pub id: i64,
+    pub id: Uuid,
     pub username: String,
 }
 
 pub fn create_jwt_token(
-    id: i64,
+    id: Uuid,
     username: String,
     duration: jwt_simple::prelude::Duration,
 ) -> Result<String, jwt_simple::Error> {
