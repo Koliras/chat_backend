@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use axum::http::header::AUTHORIZATION;
-use socketioxide::extract::{SocketRef, State};
-use sqlx::{Pool, Postgres};
+use serde::{Deserialize, Serialize};
+use socketioxide::extract::{Data, SocketRef, State};
+use sqlx::{types::Uuid, Pool, Postgres};
 
 use crate::{
     auth::{jwt::decode_jwt_payload, registration::User},
@@ -57,9 +58,57 @@ impl GetUser for SocketRef {
 pub async fn on_connect(socket: SocketRef) {
     println!("socket connected: {}", socket.id);
 
-    socket.on("message", print_user)
+    socket.on("join", join_chat_room);
 }
 
-pub async fn print_user(socket: SocketRef, State(state): State<Arc<AppState>>) {
-    println!("{:?}", socket.get_user(&state.db_pool).await);
+#[derive(Deserialize, Debug, Serialize)]
+pub struct JoinRoom {
+    chat_id: Uuid,
+}
+
+pub async fn join_chat_room(
+    socket: SocketRef,
+    Data(data): Data<JoinRoom>,
+    State(state): State<Arc<AppState>>,
+) {
+    let user = socket.get_user(&state.db_pool).await;
+    let user = match user {
+        Some(user) => user,
+        None => {
+            socket
+                .emit(
+                    "auth-error",
+                    "Could not authenticate the user by auth header",
+                )
+                .ok();
+            return;
+        }
+    };
+
+    struct ChatId {
+        id: Uuid,
+    }
+    let query_result = sqlx::query_as!(
+        ChatId,
+        "SELECT chat_id as id FROM chat.user_chat WHERE chat_id = $1 AND user_id = $2",
+        data.chat_id,
+        user.id
+    )
+    .fetch_one(&state.db_pool)
+    .await;
+
+    match query_result {
+        Ok(chat_id) => {
+            socket.leave_all().ok();
+            socket.join(format!("{}", chat_id.id)).ok();
+            socket
+                .emit("join-success", "Successfully joined the chat room")
+                .ok();
+        }
+        Err(_) => {
+            socket
+                .emit("join-error", "Could not join the chat room")
+                .ok();
+        }
+    }
 }
