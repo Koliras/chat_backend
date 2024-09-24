@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::http::header::AUTHORIZATION;
 use member::{add_member, leave_chat, remove_member};
-use message::{send_message, update_message};
+use message::{delete_message, send_message, update_message};
 use serde::{Deserialize, Serialize};
 use socketioxide::extract::{Data, SocketRef, State};
 use sqlx::{types::Uuid, Pool, Postgres};
@@ -69,6 +69,7 @@ pub async fn on_connect(socket: SocketRef) {
     socket.on("leave-chat", leave_chat);
     socket.on("send-message", send_message);
     socket.on("update-message", update_message);
+    socket.on("delete-message", delete_message);
 }
 
 #[derive(Deserialize, Debug, Serialize)]

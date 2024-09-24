@@ -171,3 +171,49 @@ pub async fn update_message(
         },
     }
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct DeleteMessage {
+    message_id: Uuid,
+}
+pub async fn delete_message(
+    socket: SocketRef,
+    Data(data): Data<DeleteMessage>,
+    State(state): State<Arc<AppState>>,
+) {
+    let user = socket.get_user(&state.db_pool).await;
+    let user = match user {
+        Some(user) => user,
+        None => {
+            socket
+                .emit("error", "Could not authenticate the user by auth header")
+                .ok();
+            return;
+        }
+    };
+
+    let deletion_result = sqlx::query!(
+        "DELETE FROM chat.message WHERE id = $1 AND user_id = $2 RETURNING chat_id",
+        data.message_id,
+        user.id
+    )
+    .fetch_one(&state.db_pool)
+    .await;
+
+    match deletion_result {
+        Ok(val) => {
+            socket
+                .within(val.chat_id.to_string())
+                .emit("deleted-message", data)
+                .ok();
+        }
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => {
+                socket.emit("error", "Could not find the message to delete or you are trying to delete someone else's message").ok();
+            }
+            _ => {
+                socket.emit("error", "Could not delete the message").ok();
+            }
+        },
+    }
+}
