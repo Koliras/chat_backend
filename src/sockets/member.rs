@@ -183,3 +183,70 @@ pub async fn remove_member(
         },
     }
 }
+
+#[derive(Deserialize)]
+pub struct LeaveChatInput {
+    chat_id: Uuid,
+}
+pub async fn leave_chat(
+    socket: SocketRef,
+    Data(data): Data<LeaveChatInput>,
+    State(state): State<Arc<AppState>>,
+) {
+    let user = socket.get_user(&state.db_pool).await;
+    let user = match user {
+        Some(user) => user,
+        None => {
+            socket
+                .emit("error", "Could not authenticate the user by auth header")
+                .ok();
+            return;
+        }
+    };
+
+    match user.is_admin(&state.db_pool, data.chat_id).await {
+        Ok(is_admin) if !is_admin => {}
+        Ok(_) => {
+            socket
+                .emit("error", "Admin cannot leave their own chat")
+                .ok();
+            return;
+        }
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => {
+                socket.emit("error", "Could not find you in this chat").ok();
+                return;
+            }
+            _ => {
+                socket
+                    .emit("error", "Could not check if you are an admin of the chat")
+                    .ok();
+                return;
+            }
+        },
+    }
+
+    let deletion_result = sqlx::query!(
+        "DELETE FROM chat.user_chat WHERE user_id = $1 AND chat_id = $2 RETURNING user_id",
+        user.id,
+        data.chat_id
+    )
+    .fetch_one(&state.db_pool)
+    .await;
+
+    match deletion_result {
+        Ok(_) => {
+            socket.emit("success", "Successfully leaved the chat").ok();
+            return;
+        }
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => {
+                socket.emit("error", "Could not find you in this chat").ok();
+                return;
+            }
+            _ => {
+                socket.emit("error", "Could not leave the chat").ok();
+            }
+        },
+    }
+}
