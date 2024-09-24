@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::http::header::AUTHORIZATION;
+use member::add_member;
 use serde::{Deserialize, Serialize};
 use socketioxide::extract::{Data, SocketRef, State};
 use sqlx::{types::Uuid, Pool, Postgres};
@@ -9,6 +10,8 @@ use crate::{
     auth::{jwt::decode_jwt_payload, registration::User},
     AppState,
 };
+
+mod member;
 
 pub trait GetUser {
     fn get_user(
@@ -59,6 +62,7 @@ pub async fn on_connect(socket: SocketRef) {
     println!("socket connected: {}", socket.id);
 
     socket.on("join", join_chat_room);
+    socket.on("add-user", add_member);
 }
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -66,7 +70,7 @@ pub struct JoinRoom {
     chat_id: Uuid,
 }
 
-pub async fn join_chat_room(
+async fn join_chat_room(
     socket: SocketRef,
     Data(data): Data<JoinRoom>,
     State(state): State<Arc<AppState>>,
@@ -76,10 +80,7 @@ pub async fn join_chat_room(
         Some(user) => user,
         None => {
             socket
-                .emit(
-                    "auth-error",
-                    "Could not authenticate the user by auth header",
-                )
+                .emit("error", "Could not authenticate the user by auth header")
                 .ok();
             return;
         }
@@ -102,13 +103,11 @@ pub async fn join_chat_room(
             socket.leave_all().ok();
             socket.join(format!("{}", chat_id.id)).ok();
             socket
-                .emit("join-success", "Successfully joined the chat room")
+                .emit("success", "Successfully joined the chat room")
                 .ok();
         }
         Err(_) => {
-            socket
-                .emit("join-error", "Could not join the chat room")
-                .ok();
+            socket.emit("error", "Could not join the chat room").ok();
         }
     }
 }
