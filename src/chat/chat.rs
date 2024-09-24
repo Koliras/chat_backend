@@ -17,7 +17,11 @@ pub struct CreateChat {
 }
 
 impl User {
-    async fn is_admin(&self, executor: &sqlx::Pool<Postgres>, chat_id: Uuid) -> sqlx::Result<bool> {
+    pub async fn is_admin(
+        &self,
+        executor: &sqlx::Pool<Postgres>,
+        chat_id: Uuid,
+    ) -> sqlx::Result<bool> {
         struct AdminId {
             admin_id: Uuid,
         }

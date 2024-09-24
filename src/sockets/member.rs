@@ -7,14 +7,14 @@ use uuid::Uuid;
 use crate::{sockets::GetUser, AppState};
 
 #[derive(Deserialize)]
-pub struct AddToChat {
+pub struct ChatMembershipInput {
     user_id: Uuid,
     chat_id: Uuid,
 }
 
 pub async fn add_member(
     socket: SocketRef,
-    Data(data): Data<AddToChat>,
+    Data(data): Data<ChatMembershipInput>,
     State(state): State<Arc<AppState>>,
 ) {
     let user = socket.get_user(&state.db_pool).await;
@@ -110,6 +110,76 @@ pub async fn add_member(
                         "error",
                         "Could not add user to the chat due to internal reasons",
                     )
+                    .ok();
+            }
+        },
+    }
+}
+
+pub async fn remove_member(
+    socket: SocketRef,
+    Data(data): Data<ChatMembershipInput>,
+    State(state): State<Arc<AppState>>,
+) {
+    let user = socket.get_user(&state.db_pool).await;
+    let user = match user {
+        Some(user) if user.id != data.user_id => user,
+        Some(_) => {
+            socket
+                .emit("error", "Admin cannot remove himself from the chat")
+                .ok();
+            return;
+        }
+        None => {
+            socket
+                .emit("error", "Could not authenticate the user by auth header")
+                .ok();
+            return;
+        }
+    };
+
+    match user.is_admin(&state.db_pool, data.chat_id).await {
+        Ok(is_admin) if is_admin => {}
+        Ok(_) => {
+            socket
+                .emit("error", "Only admin can remove other users from the chat")
+                .ok();
+            return;
+        }
+        Err(_) => {
+            socket
+                .emit(
+                    "error",
+                    "Could not validate that you are an admin of the chat",
+                )
+                .ok();
+            return;
+        }
+    }
+
+    let deletion_result = sqlx::query!(
+        "DELETE FROM chat.user_chat WHERE user_id = $1 AND chat_id = $2 RETURNING user_id",
+        data.user_id,
+        data.chat_id
+    )
+    .fetch_one(&state.db_pool)
+    .await;
+
+    match deletion_result {
+        Ok(_) => {
+            socket
+                .emit("success", "Successfully removed user from the chat")
+                .ok();
+            return;
+        }
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => {
+                socket.emit("error", "Could not find user in chat").ok();
+                return;
+            }
+            _ => {
+                socket
+                    .emit("error", "Could not remove user from the chat")
                     .ok();
             }
         },

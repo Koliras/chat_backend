@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::http::header::AUTHORIZATION;
-use member::add_member;
+use member::{add_member, remove_member};
 use serde::{Deserialize, Serialize};
 use socketioxide::extract::{Data, SocketRef, State};
 use sqlx::{types::Uuid, Pool, Postgres};
@@ -63,6 +63,7 @@ pub async fn on_connect(socket: SocketRef) {
 
     socket.on("join", join_chat_room);
     socket.on("add-user", add_member);
+    socket.on("remove-user", remove_member);
 }
 
 #[derive(Deserialize, Debug, Serialize)]
