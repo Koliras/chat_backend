@@ -17,6 +17,12 @@ pub async fn send_message(
     Data(data): Data<SendMessageInput>,
     State(state): State<Arc<AppState>>,
 ) {
+    if data.content.trim().len() == 0 {
+        socket
+            .emit("error", "Message cannot be 0 characters long")
+            .ok();
+        return;
+    }
     let user = socket.get_user(&state.db_pool).await;
     let user = match user {
         Some(user) => user,
@@ -73,7 +79,7 @@ pub async fn send_message(
     let create_message = sqlx::query_as!(
         NormalizedMessage,
         "INSERT INTO chat.message (content, user_id, chat_id) VALUES ($1, $2, $3) RETURNING id, content, user_id, created_at",
-        data.content,
+        data.content.trim(),
         user.id,
         data.chat_id
     )
