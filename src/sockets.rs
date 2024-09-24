@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::http::header::AUTHORIZATION;
 use member::{add_member, leave_chat, remove_member};
+use message::send_message;
 use serde::{Deserialize, Serialize};
 use socketioxide::extract::{Data, SocketRef, State};
 use sqlx::{types::Uuid, Pool, Postgres};
@@ -12,6 +13,7 @@ use crate::{
 };
 
 mod member;
+mod message;
 
 pub trait GetUser {
     fn get_user(
@@ -65,6 +67,7 @@ pub async fn on_connect(socket: SocketRef) {
     socket.on("add-user", add_member);
     socket.on("remove-user", remove_member);
     socket.on("leave-chat", leave_chat);
+    socket.on("send-message", send_message);
 }
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -103,7 +106,7 @@ async fn join_chat_room(
     match query_result {
         Ok(chat_id) => {
             socket.leave_all().ok();
-            socket.join(format!("{}", chat_id.id)).ok();
+            socket.join(chat_id.id.to_string()).ok();
             socket
                 .emit("success", "Successfully joined the chat room")
                 .ok();
