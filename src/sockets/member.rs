@@ -19,7 +19,13 @@ pub async fn add_member(
 ) {
     let user = socket.get_user(&state.db_pool).await;
     let user = match user {
-        Some(user) => user,
+        Some(user) if user.id != data.user_id => user,
+        Some(_) => {
+            socket
+                .emit("error", "You cannot add yourself to the chat")
+                .ok();
+            return;
+        }
         None => {
             socket
                 .emit("error", "Could not authenticate the user by auth header")
@@ -27,13 +33,6 @@ pub async fn add_member(
             return;
         }
     };
-
-    if data.user_id == user.id {
-        socket
-            .emit("error", "You cannot add yourself to the chat")
-            .ok();
-        return;
-    }
 
     let result = sqlx::query!(
         "SELECT EXISTS (SELECT 1 FROM chat.user_chat WHERE user_id = $1 AND chat_id = $2)",
@@ -43,9 +42,18 @@ pub async fn add_member(
     .fetch_one(&state.db_pool)
     .await;
 
-    let in_chat = match result {
+    match result {
         Ok(val) => match val.exists {
-            Some(b) => b,
+            Some(in_chat) if in_chat => {}
+            Some(_) => {
+                socket
+                    .emit(
+                        "error",
+                        "You cannot add users to chat you yourself are not the part of",
+                    )
+                    .ok();
+                return;
+            }
             None => {
                 socket
                     .emit("error", "Failed to check if you are in the chat")
@@ -60,16 +68,6 @@ pub async fn add_member(
             return;
         }
     };
-
-    if !in_chat {
-        socket
-            .emit(
-                "error",
-                "You cannot add users to chat you yourself are not the part of",
-            )
-            .ok();
-        return;
-    }
 
     let add_user = sqlx::query!(
         "INSERT INTO chat.user_chat (user_id, chat_id) VALUES($1, $2)",
