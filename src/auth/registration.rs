@@ -32,6 +32,14 @@ pub trait Validity {
 }
 
 impl Validity for String {
+    /// Checks if the string is a valid password.
+    /// To be considered valid, string has to be at least 8 characters long,
+    /// and contain at least 1 number, 1 uppercase letter, 1 lowercase letter,
+    /// and 1 special symbol.
+    ///
+    /// # Returns
+    /// If string is a valid password, returns ();
+    /// If string is not a valid password, returns the error with the reason why.
     fn is_valid_password(&self) -> Result<(), String> {
         if self.len() < 8 {
             return Err(
@@ -129,12 +137,11 @@ pub async fn register(
         Err(message) => return (StatusCode::BAD_REQUEST, message).into_response(),
     }
     let pass_encrypt_res = bcrypt::hash(payload.password.as_bytes(), 10);
-    let password: String;
 
-    match pass_encrypt_res {
-        Ok(hash) => password = hash,
+    let password = match pass_encrypt_res {
+        Ok(hash) => hash,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    };
 
     let result =
         sqlx::query("INSERT INTO chat.user (username, email, password) VALUES ($1, $2, $3)")
