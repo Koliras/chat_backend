@@ -22,10 +22,11 @@ pub async fn jwt_authorization(
         .get(header::AUTHORIZATION)
         .and_then(|auth| auth.to_str().ok());
 
-    let auth_header = if let Some(auth) = auth_header {
-        auth
-    } else {
-        return Err(StatusCode::UNAUTHORIZED);
+    let auth_header = match auth_header {
+        Some(auth) => auth,
+        None => {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
     };
 
     let split_auth_header: Vec<&str> = auth_header.split(" ").collect();
@@ -35,10 +36,11 @@ pub async fn jwt_authorization(
 
     let jwt_payload = decode_jwt_payload(split_auth_header[1]);
 
-    let jwt_payload = if let Ok(payload) = jwt_payload {
-        payload
-    } else {
-        return Err(StatusCode::UNAUTHORIZED);
+    let jwt_payload = match jwt_payload {
+        Ok(payload) => payload,
+        Err(_) => {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
     };
 
     let user_search = sqlx::query_as!(
