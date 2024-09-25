@@ -7,12 +7,13 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::types::Uuid;
 
 use crate::AppState;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 pub struct User {
-    pub id: i64,
+    pub id: Uuid,
     pub username: String,
     pub password: String,
     pub email: String,

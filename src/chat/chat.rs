@@ -7,7 +7,7 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, Postgres};
+use sqlx::{prelude::FromRow, types::Uuid, Postgres};
 
 use crate::{auth::registration::User, AppState};
 
@@ -17,9 +17,13 @@ pub struct CreateChat {
 }
 
 impl User {
-    async fn is_admin(&self, executor: &sqlx::Pool<Postgres>, chat_id: i64) -> sqlx::Result<bool> {
+    pub async fn is_admin(
+        &self,
+        executor: &sqlx::Pool<Postgres>,
+        chat_id: Uuid,
+    ) -> sqlx::Result<bool> {
         struct AdminId {
-            admin_id: i64,
+            admin_id: Uuid,
         }
 
         let admin_id = sqlx::query_as!(
@@ -47,7 +51,7 @@ pub async fn create_chat(
             .into_response();
     }
     struct ChatId {
-        id: i64,
+        id: Uuid,
     }
 
     let tx = state.db_pool.begin().await;
@@ -99,7 +103,7 @@ pub async fn create_chat(
 #[derive(FromRow, Serialize)]
 pub struct Chat {
     name: String,
-    chat_id: i64,
+    chat_id: Uuid,
     admin_username: String,
 }
 
@@ -139,7 +143,7 @@ pub async fn get_chats(
 }
 
 pub async fn delete_chat(
-    Path(chat_id): Path<i64>,
+    Path(chat_id): Path<Uuid>,
     Extension(user): Extension<User>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
@@ -226,7 +230,7 @@ pub struct RenameChat {
 }
 
 pub async fn rename_chat(
-    Path(chat_id): Path<i64>,
+    Path(chat_id): Path<Uuid>,
     Extension(user): Extension<User>,
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RenameChat>,
