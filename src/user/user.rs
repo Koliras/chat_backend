@@ -24,25 +24,24 @@ pub async fn change_password(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<ChangePassword>,
 ) -> Response {
-    match payload.new_password.is_valid_password() {
-        Ok(_) => {}
-        Err(message) => return (StatusCode::FORBIDDEN, message).into_response(),
+    if let Err(message) = payload.new_password.is_valid_password() {
+        return (StatusCode::FORBIDDEN, message).into_response();
     }
 
     let is_same = bcrypt::verify(&payload.old_password, &user.password);
 
-    let is_same = if let Ok(same) = is_same {
-        same
-    } else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not change password due to internal reasons",
-        )
-            .into_response();
-    };
-
-    if !is_same {
-        return (StatusCode::FORBIDDEN, "Password isn't correct.").into_response();
+    match is_same {
+        Ok(same) if same => {}
+        Ok(_) => {
+            return (StatusCode::FORBIDDEN, "Old password isn't correct.").into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not change password due to internal reasons",
+            )
+                .into_response();
+        }
     }
 
     if &payload.old_password == &payload.new_password {
@@ -76,7 +75,7 @@ pub async fn change_password(
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not update the password.".to_string(),
+            "Could not update the password".to_string(),
         )
             .into_response(),
     }
