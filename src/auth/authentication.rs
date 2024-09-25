@@ -21,7 +21,7 @@ pub struct LoginDto {
 }
 
 pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<LoginDto>) -> Response {
-    pub struct UserPayload {
+    struct UserPayload {
         id: Uuid,
         username: String,
         password: String,
@@ -31,41 +31,35 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
         "SELECT id, password, username FROM chat.user WHERE email=$1 LIMIT 1",
         &payload.email,
     )
-    .fetch_optional(&state.db_pool)
+    .fetch_one(&state.db_pool)
     .await;
 
-    let is_valid_password: BcryptResult<bool>;
-    let user: UserPayload;
-
-    match query_result {
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        Ok(res) => match res {
-            Some(received_user) => {
-                is_valid_password = bcrypt::verify(payload.password, &received_user.password);
-                user = received_user;
-            }
-            None => {
+    let user = match query_result {
+        Ok(res) => res,
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => {
                 return (
                     StatusCode::UNAUTHORIZED,
                     "User with such email or password doesn't exist",
                 )
                     .into_response()
             }
+            _ => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         },
-    }
-
-    let is_valid = if let Ok(valid) = is_valid_password {
-        valid
-    } else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
-    if !is_valid {
-        return (
-            StatusCode::UNAUTHORIZED,
-            "User with such email or password doesn't exist",
-        )
-            .into_response();
+    let is_valid_password = bcrypt::verify(payload.password, &user.password);
+
+    match is_valid_password {
+        Ok(is_valid) if is_valid => {}
+        Ok(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                "User with such email or password doesn't exist",
+            )
+                .into_response();
+        }
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 
     let access_token = create_jwt_token(
@@ -74,10 +68,11 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
         jwt_simple::prelude::Duration::from_mins(10),
     );
 
-    let access_token = if let Ok(token) = access_token {
-        token
-    } else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    let access_token = match access_token {
+        Ok(token) => token,
+        Err(_) => {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
     };
 
     let refresh_token = create_jwt_token(
@@ -85,10 +80,11 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
         user.username,
         jwt_simple::prelude::Duration::from_days(3),
     );
-    let refresh_token = if let Ok(token) = refresh_token {
-        token
-    } else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    let refresh_token = match refresh_token {
+        Ok(token) => token,
+        Err(_) => {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
     };
 
     let headers = AppendHeaders([(SET_COOKIE, format!("Chat-Refresh={refresh_token}"))]);
