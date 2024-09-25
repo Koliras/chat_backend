@@ -6,7 +6,6 @@ use axum::{
     response::{AppendHeaders, IntoResponse, Response},
     Extension, Json,
 };
-use bcrypt::BcryptResult;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 
