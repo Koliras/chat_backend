@@ -82,8 +82,7 @@ async fn join_chat_room(
     Data(data): Data<JoinRoom>,
     State(state): State<Arc<AppState>>,
 ) {
-    let user = socket.get_user(&state.db_pool).await;
-    let user = match user {
+    let user = match socket.get_user(&state.db_pool).await {
         Some(user) => user,
         None => {
             socket

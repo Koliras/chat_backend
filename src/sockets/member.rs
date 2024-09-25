@@ -17,8 +17,7 @@ pub async fn add_member(
     Data(data): Data<ChatMembershipInput>,
     State(state): State<Arc<AppState>>,
 ) {
-    let user = socket.get_user(&state.db_pool).await;
-    let user = match user {
+    let user = match socket.get_user(&state.db_pool).await {
         Some(user) if user.id != data.user_id => user,
         Some(_) => {
             socket
@@ -124,7 +123,7 @@ pub async fn remove_member(
         Some(user) if user.id != data.user_id => user,
         Some(_) => {
             socket
-                .emit("error", "Admin cannot remove himself from the chat")
+                .emit("error", "User cannot remove himself from the chat")
                 .ok();
             return;
         }
