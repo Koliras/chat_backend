@@ -60,16 +60,24 @@ impl GetUser for SocketRef {
     }
 }
 
-pub async fn on_connect(socket: SocketRef) {
-    println!("socket connected: {}", socket.id);
+mod socket_event {
+    pub const JOIN: &'static str = "join";
+    pub const ADD_USER: &'static str = "add-user";
+    pub const REMOVE_USER: &'static str = "remove-user";
+    pub const LEAVE_CHAT: &'static str = "leave-chat";
+    pub const SEND_MESSAGE: &'static str = "send-message";
+    pub const UPDATE_MESSAGE: &'static str = "update-message";
+    pub const DELETE_MESSAGE: &'static str = "delete-message";
+}
 
-    socket.on("join", join_chat_room);
-    socket.on("add-user", add_member);
-    socket.on("remove-user", remove_member);
-    socket.on("leave-chat", leave_chat);
-    socket.on("send-message", send_message);
-    socket.on("update-message", update_message);
-    socket.on("delete-message", delete_message);
+pub async fn on_connect(socket: SocketRef) {
+    socket.on(socket_event::JOIN, join_chat_room);
+    socket.on(socket_event::ADD_USER, add_member);
+    socket.on(socket_event::REMOVE_USER, remove_member);
+    socket.on(socket_event::LEAVE_CHAT, leave_chat);
+    socket.on(socket_event::SEND_MESSAGE, send_message);
+    socket.on(socket_event::UPDATE_MESSAGE, update_message);
+    socket.on(socket_event::DELETE_MESSAGE, delete_message);
 }
 
 #[derive(Deserialize, Debug, Serialize)]
