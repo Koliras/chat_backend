@@ -64,7 +64,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(payload): Json<Login
     let access_token = create_jwt_token(
         user.id,
         user.username.clone(),
-        jwt_simple::prelude::Duration::from_mins(10),
+        jwt_simple::prelude::Duration::from_hours(2),
     );
 
     let access_token = match access_token {
