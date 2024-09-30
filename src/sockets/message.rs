@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use socketioxide::extract::{Data, SocketRef, State};
+use socketioxide::extract::{SocketRef, State, TryData};
 use sqlx::types::Uuid;
 
 use crate::{sockets::GetUser, AppState};
@@ -23,9 +23,16 @@ struct NormalizedMessage {
 
 pub async fn send_message(
     socket: SocketRef,
-    Data(data): Data<SendMessageInput>,
+    TryData(data): TryData<SendMessageInput>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     if data.content.trim().len() == 0 {
         socket
             .emit("error", "Message cannot be 0 characters long")
@@ -108,9 +115,16 @@ pub struct UpdateMessageInput {
 }
 pub async fn update_message(
     socket: SocketRef,
-    Data(data): Data<UpdateMessageInput>,
+    TryData(data): TryData<UpdateMessageInput>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     if data.new_content.trim().len() == 0 {
         socket
             .emit("error", "New message content cannot be 0 characters long")
@@ -178,9 +192,16 @@ pub struct DeleteMessage {
 }
 pub async fn delete_message(
     socket: SocketRef,
-    Data(data): Data<DeleteMessage>,
+    TryData(data): TryData<DeleteMessage>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     let user = socket.get_user(&state.db_pool).await;
     let user = match user {
         Some(user) => user,

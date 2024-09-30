@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use serde::Deserialize;
-use socketioxide::extract::{Data, SocketRef, State};
+use socketioxide::extract::{SocketRef, State, TryData};
 use uuid::Uuid;
 
 use crate::{sockets::GetUser, AppState};
@@ -14,9 +14,16 @@ pub struct ChatMembershipInput {
 
 pub async fn add_member(
     socket: SocketRef,
-    Data(data): Data<ChatMembershipInput>,
+    TryData(data): TryData<ChatMembershipInput>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     let user = match socket.get_user(&state.db_pool).await {
         Some(user) if user.id != data.user_id => user,
         Some(_) => {
@@ -115,9 +122,16 @@ pub async fn add_member(
 
 pub async fn remove_member(
     socket: SocketRef,
-    Data(data): Data<ChatMembershipInput>,
+    TryData(data): TryData<ChatMembershipInput>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     let user = socket.get_user(&state.db_pool).await;
     let user = match user {
         Some(user) if user.id != data.user_id => user,
@@ -189,9 +203,16 @@ pub struct LeaveChatInput {
 }
 pub async fn leave_chat(
     socket: SocketRef,
-    Data(data): Data<LeaveChatInput>,
+    TryData(data): TryData<LeaveChatInput>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     let user = socket.get_user(&state.db_pool).await;
     let user = match user {
         Some(user) => user,

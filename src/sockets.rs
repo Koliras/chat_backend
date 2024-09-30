@@ -4,7 +4,7 @@ use axum::http::header::AUTHORIZATION;
 use member::{add_member, leave_chat, remove_member};
 use message::{delete_message, send_message, update_message};
 use serde::{Deserialize, Serialize};
-use socketioxide::extract::{Data, SocketRef, State};
+use socketioxide::extract::{SocketRef, State, TryData};
 use sqlx::{types::Uuid, Pool, Postgres};
 
 use crate::{
@@ -87,9 +87,16 @@ pub struct JoinRoom {
 
 async fn join_chat_room(
     socket: SocketRef,
-    Data(data): Data<JoinRoom>,
+    TryData(data): TryData<JoinRoom>,
     State(state): State<Arc<AppState>>,
 ) {
+    let data = match data {
+        Ok(data) => data,
+        Err(_) => {
+            socket.emit("error", "Could not parse body. Please, make sure you have all the required fields with correct names").ok();
+            return;
+        }
+    };
     let user = match socket.get_user(&state.db_pool).await {
         Some(user) => user,
         None => {
