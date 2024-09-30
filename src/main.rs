@@ -1,11 +1,9 @@
-use axum::{routing::post, Router};
+use axum::Router;
 use dotenv::dotenv;
+use socketioxide::SocketIo;
 use std::{error::Error, sync::Arc};
 
-use chat_backend::{
-    auth::{login, register},
-    init_db, AppState,
-};
+use chat_backend::{auth, chat, init_db, sockets::on_connect, user, AppState};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -14,10 +12,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let db_pool = init_db().await;
     let shared_state = Arc::new(AppState { db_pool });
 
+    let (layer, io) = SocketIo::builder()
+        .with_state(shared_state.clone())
+        .build_layer();
+
+    io.ns("/", on_connect);
+
     let app = Router::new()
-        .route("/login", post(login))
-        .route("/register", post(register))
-        .with_state(shared_state);
+        .nest("/auth", auth::routes(shared_state.clone()))
+        .nest("/chat", chat::routes(shared_state.clone()))
+        .nest("/user", user::routes(shared_state.clone()))
+        .with_state(shared_state)
+        .layer(layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();

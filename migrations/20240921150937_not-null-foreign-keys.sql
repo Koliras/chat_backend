@@ -1,0 +1,10 @@
+ALTER TABLE chat.chat
+	ALTER COLUMN admin_id SET NOT NULL;
+
+ALTER TABLE chat.message
+	ALTER COLUMN user_id SET NOT NULL,
+	ALTER COLUMN chat_id SET NOT NULL;
+
+ALTER TABLE chat.user_chat
+	ALTER COLUMN user_id SET NOT NULL,
+	ALTER COLUMN chat_id SET NOT NULL;
